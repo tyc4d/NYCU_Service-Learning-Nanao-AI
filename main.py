@@ -1,4 +1,5 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException 
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from PIL import Image, ImageOps
 import os
@@ -12,6 +13,9 @@ STYLED_FOLDER = "avatar_styled"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(STYLED_FOLDER, exist_ok=True)
+
+app.mount("/avatar_original", StaticFiles(directory=UPLOAD_FOLDER), name="avatar_original")
+app.mount("/avatar_styled", StaticFiles(directory=STYLED_FOLDER), name="avatar_styled")
 
 def is_valid_image(file: UploadFile):
     try:
@@ -47,14 +51,14 @@ async def upload_image(file: UploadFile, user_id: str = None):
 
         styled_paths = []
         styles = [
-            ("cartoon4-d", 0.5),
-            ("cartoon3-d", 0.75),
-            ("cartoon5-d", 0.5)
+            ("cartoon4-d", 0.5, 26),
+            ("cartoon3-d", 0.75, 71),
+            ("cartoon5-d", 0.5, 97)
         ]
-        for i, (model_key, style_degree) in enumerate(styles, start=1):
+        for i, (model_key, style_degree, style_id) in enumerate(styles, start=1):
             styled_filename = f"styled-ca{i}-{user_id}.{ext}"
             styled_path = os.path.join(STYLED_FOLDER, styled_filename)
-            process_image_with_vtoonify(original_path, styled_path, model_key, style_degree, style_id=26)
+            process_image_with_vtoonify(original_path, styled_path, model_key, style_degree, style_id)
             styled_paths.append(styled_path)
 
         return JSONResponse(content={"status": "ok", "styled_images": styled_paths})
