@@ -9,7 +9,7 @@ from model.vtoonify import VToonify
 from model.bisenet.model import BiSeNet
 from model.encoder.align_all_parallel import align_face
 from util import save_image, load_image, visualize, load_psp_standalone, get_video_crop_parameter, tensor2cv2
-
+# Util 取自原始專案 Vtoonify
 # Set device to CPU
 device = "cpu"
 
@@ -28,7 +28,7 @@ parsing_model_path = './checkpoint/faceparsing.pth'
 style_encoder_path = './checkpoint/encoder.pt'
 landmark_predictor_path = './checkpoint/shape_predictor_68_face_landmarks.dat'
 
-# Load models once to reuse
+# 載入 vtoonify 的模組直接使用 並且在生成部分指定使用 dualstylegan
 vtoonify_instances = {name: VToonify(backbone='dualstylegan').to(device) for name in vtoonify_models}
 for name, model in vtoonify_instances.items():
     model.load_state_dict(torch.load(vtoonify_models[name], map_location=device)['g_ema'])
@@ -37,21 +37,22 @@ parsing_predictor = BiSeNet(n_classes=19)
 parsing_predictor.load_state_dict(torch.load(parsing_model_path, map_location=device))
 parsing_predictor.to(device).eval()
 
+# 地標辨識系統 原本模組有所以也幫他加上去了
 if not os.path.exists(landmark_predictor_path):
-    import wget, bz2
+    import wget, bz2 # 沒有就會下載
     wget.download('http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2', landmark_predictor_path + '.bz2')
     with bz2.BZ2File(landmark_predictor_path + '.bz2') as zipfile:
         data = zipfile.read()
         with open(landmark_predictor_path, 'wb') as f:
             f.write(data)
 
-landmark_predictor = dlib.shape_predictor(landmark_predictor_path)
+landmark_predictor = dlib.shape_predictor(landmark_predictor_path) 
 psp_encoder = load_psp_standalone(style_encoder_path, device)
 
-exstyle_path = './checkpoint/exstyle_code.npy'
+exstyle_path = './checkpoint/exstyle_code.npy' # 還有 style model
 exstyles = np.load(exstyle_path, allow_pickle='TRUE').item()
 
-def process_image_with_vtoonify(input_path, output_path, model_key, style_degree, style_id):
+def process_image_with_vtoonify(input_path, output_path, model_key, style_degree, style_id): #傳入 Vtoonify 的 Final Function
     vtoonify = vtoonify_instances[model_key]
     exstyle = torch.tensor(exstyles[list(exstyles.keys())[style_id]]).to(device)
     with torch.no_grad():
@@ -60,7 +61,7 @@ def process_image_with_vtoonify(input_path, output_path, model_key, style_degree
     image = cv2.imread(input_path)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     I = align_face(image, landmark_predictor)
-    I = transform(I).unsqueeze(dim=0).to(device)
+    I = transform(I).unsqueeze(dim=0).to(device) # 進行識別後的臉部校正置中
 
     s_w = psp_encoder(I)
     s_w = vtoonify.zplus2wplus(s_w)
