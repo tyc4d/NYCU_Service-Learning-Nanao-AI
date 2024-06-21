@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageOps
 from vtoonify_api import process_image_with_vtoonify
 import os
@@ -9,6 +10,18 @@ import uvicorn
 
 app = FastAPI() # UVICORN main:app
 
+origins = [
+    "http://localhost",
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 UPLOAD_FOLDER = "avatar_upload" # 原始頭貼上傳目錄
 STYLED_FOLDER = "avatar_styled" # 生成式AI產圖目錄
 
@@ -45,7 +58,11 @@ async def upload_image(file: UploadFile, user_id: str = None):
         raise HTTPException(status_code=400, detail="Invalid image binary")
 
     if user_id == None: # 確認使用者是否有輸入 user id 
+        raise HTTPException(status_code=400, detail="Empty User ID")
+
+    if not user_id.isnumeric():
         raise HTTPException(status_code=400, detail="Invalid User ID")
+
     try: # 嘗試跑模型
         original_path = process_image(file, user_id)
         ext = file.filename.split('.')[-1]
@@ -64,6 +81,8 @@ async def upload_image(file: UploadFile, user_id: str = None):
 
         return JSONResponse(content={"status": "ok", "styled_images": styled_paths})
     except Exception as e: # 有問題直接丟例外
+        if "NoneType" in str(e):
+            raise HTTPException(status_code=400, detail="Please upload picture with face, Execption:"+str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
