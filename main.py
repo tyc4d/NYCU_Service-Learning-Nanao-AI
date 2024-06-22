@@ -7,6 +7,7 @@ from vtoonify_api import process_image_with_vtoonify
 import os
 import uuid
 import uvicorn
+import cv2
 
 app = FastAPI() # UVICORN main:app
 
@@ -43,10 +44,12 @@ def process_image(file: UploadFile, user_id: str): # 使用者上傳圖片會先
     file.file.seek(0)
     image = Image.open(file.file)
     image = ImageOps.pad(image, (512, 512), color='white')
-    ext = file.filename.split('.')[-1]
-    filename = f"original-{user_id}.{ext}" # 無論檔案名稱如何都重新命名給該 userid
+    filename = f"original-{user_id}.jpg" # 無論檔案名稱如何都重新命名給該 userid
     path = os.path.join(UPLOAD_FOLDER, filename)
     image.save(path)
+    imgcv = cv2.imread(path)
+    ext = file.filename.split('.')[-1]
+    cv2.imwrite(path, imgcv, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
     return path
 
 @app.post("/upload") # upload 路徑主程式
@@ -65,7 +68,8 @@ async def upload_image(file: UploadFile, user_id: str = None):
 
     try: # 嘗試跑模型
         original_path = process_image(file, user_id)
-        ext = file.filename.split('.')[-1]
+        #ext = file.filename.split('.')[-1]
+        ext = "jpg"
 
         styled_paths = []
         styles = [ # model_key  style_degree  style_id
